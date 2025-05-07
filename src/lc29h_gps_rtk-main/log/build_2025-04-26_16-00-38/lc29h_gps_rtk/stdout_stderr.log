@@ -1,0 +1,10 @@
+[0mCMake Error: The current CMakeCache.txt directory /home/kemo/lc29h_gps_rtk-main/build/lc29h_gps_rtk/CMakeCache.txt is different than the directory /home/kemo/Azza_ws/src/lc29h_gps_rtk-main/build/lc29h_gps_rtk where CMakeCache.txt was created. This may result in binaries being created in the wrong place. If you are not sure, reedit the CMakeCache.txt[0m
+CMake Error: Target DependInfo.cmake file not found
+Built target lc29h_gps_rtk_node
+-- Install configuration: ""
+[31mCMake Error at cmake_install.cmake:52 (file):
+  file INSTALL cannot find
+  "/home/kemo/Azza_ws/src/lc29h_gps_rtk-main/build/lc29h_gps_rtk/lc29h_gps_rtk_node":
+  No such file or directory.
+
+[0m

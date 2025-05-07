@@ -1,0 +1,4 @@
+source;share/lc29h_gps_rtk/local_setup.bash
+source;share/lc29h_gps_rtk/local_setup.dsv
+source;share/lc29h_gps_rtk/local_setup.sh
+source;share/lc29h_gps_rtk/local_setup.zsh

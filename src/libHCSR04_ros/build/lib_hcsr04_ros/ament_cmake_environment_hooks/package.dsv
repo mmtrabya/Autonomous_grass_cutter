@@ -1,0 +1,4 @@
+source;share/lib_hcsr04_ros/local_setup.bash
+source;share/lib_hcsr04_ros/local_setup.dsv
+source;share/lib_hcsr04_ros/local_setup.sh
+source;share/lib_hcsr04_ros/local_setup.zsh

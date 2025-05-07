@@ -1,0 +1,629 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf version="1.6">
+  <world name='empty'>
+
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <world_frame_orientation>ENU</world_frame_orientation>
+      <latitude_deg>47.397742</latitude_deg>    <!-- same as sensor -->
+      <longitude_deg>8.545594</longitude_deg>
+      <elevation>488.0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+    
+    <physics name='1ms' type='ode'>  
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+    <plugin name='gz::sim::systems::Physics' filename='ignition-gazebo-physics-system'/>
+    <plugin name='gz::sim::systems::UserCommands' filename='ignition-gazebo-user-commands-system'/>
+    <plugin name='gz::sim::systems::SceneBroadcaster' filename='ignition-gazebo-scene-broadcaster-system'/>
+    <plugin name='gz::sim::systems::Contact' filename='ignition-gazebo-contact-system'/>
+    <plugin filename="libignition-gazebo-imu-system.so"
+        name="ignition::gazebo::systems::Imu">
+    </plugin>
+    <plugin
+      filename="ignition-gazebo-sensors-system"
+      name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+        <gui fullscreen='false'>
+      <plugin name='3D View' filename='GzScene3D'>
+        <ignition-gui>
+          <title>3D View</title>
+          <property type='bool' key='showTitleBar'>false</property>
+          <property type='string' key='state'>docked</property>
+        </ignition-gui>
+        <engine>ogre2</engine>
+        <scene>scene</scene>
+        <ambient_light>0.4 0.4 0.4</ambient_light>
+        <background_color>0.5 0.8 0.95</background_color>
+        <camera_follow>
+          <target>prius_hybrid</target>
+          <p_gain>0.5</p_gain>
+          <offset>0.5 5 2</offset>
+        </camera_follow>
+      </plugin>
+
+      <!-- <plugin filename="InteractiveViewControl" name="Interactive view control">
+        <ignition-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </ignition-gui>
+      </plugin> -->
+
+      <plugin name='World control' filename='WorldControl'>
+        <ignition-gui>
+          <title>World control</title>
+          <property type='bool' key='showTitleBar'>false</property>
+          <property type='bool' key='resizable'>false</property>
+          <property type='double' key='height'>72</property>
+          <property type='double' key='width'>121</property>
+          <property type='double' key='z'>1</property>
+          <property type='string' key='state'>floating</property>
+          <anchors target='3D View'>
+            <line own='left' target='left'/>
+            <line own='bottom' target='bottom'/>
+          </anchors>
+        </ignition-gui>
+        <play_pause>true</play_pause>
+        <step>true</step>
+        <start_paused>true</start_paused>
+      </plugin>
+      <plugin name='World stats' filename='WorldStats'>
+        <ignition-gui>
+          <title>World stats</title>
+          <property type='bool' key='showTitleBar'>false</property>
+          <property type='bool' key='resizable'>false</property>
+          <property type='double' key='height'>110</property>
+          <property type='double' key='width'>290</property>
+          <property type='double' key='z'>1</property>
+          <property type='string' key='state'>floating</property>
+          <anchors target='3D View'>
+            <line own='right' target='right'/>
+            <line own='bottom' target='bottom'/>
+          </anchors>
+        </ignition-gui>
+        <sim_time>true</sim_time>
+        <real_time>true</real_time>
+        <real_time_factor>true</real_time_factor>
+        <iterations>true</iterations>
+      </plugin>
+      <!-- <plugin name='dis' filename='ImageDisplay'>
+        <ignition-gui>
+          <property key='state' type='string'>docked</property>
+        </ignition-gui>
+        <topic>front_camera</topic>
+      </plugin> -->
+      <!-- <plugin name='Teleop' filename='Teleop'>
+        <ignition-gui>
+          <property type='string' key='state'>docked</property>
+        </ignition-gui>
+        <topic>/cmd_vel</topic>
+      </plugin>
+    
+    <plugin filename="EntityTree" name="Entity tree">
+    </plugin> -->
+
+    <!-- <plugin filename="CameraTracking" name="Camera Tracking">
+        <ignition-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </ignition-gui>
+    </plugin> -->
+    </gui>
+    <gravity>0 0 -9.8</gravity>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <atmosphere type='adiabatic'/>
+    <scene>
+      <ambient>0.4 0.4 0.4 1</ambient>
+      <background>0.7 0.7 0.7 1</background>
+      <shadows>true</shadows>
+    </scene>
+    <model name='ground_plane'>
+      <static>true</static>
+      <link name='link'>
+        <collision name='collision'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+            <contact/>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.8 0.8 0.8 1</specular>
+          </material>
+        </visual>
+        <pose>0 0 0 0 -0 0</pose>
+        <inertial>
+          <pose>0 0 0 0 -0 0</pose>
+          <mass>1</mass>
+          <inertia>
+            <ixx>1</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1</iyy>
+            <iyz>0</iyz>
+            <izz>1</izz>
+          </inertia>
+        </inertial>
+        <enable_wind>false</enable_wind>
+      </link>
+      <pose>0 0 0 0 -0 0</pose>
+      <self_collide>false</self_collide>
+    </model>
+    <light name='sun' type='directional'>
+      <pose>0 0 10 0 -0 0</pose>
+      <cast_shadows>true</cast_shadows>
+      <intensity>1</intensity>
+      <direction>-0.5 0.1 -0.9</direction>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <linear>0.01</linear>
+        <constant>0.90000000000000002</constant>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <spot>
+        <inner_angle>0</inner_angle>
+        <outer_angle>0</outer_angle>
+        <falloff>0</falloff>
+      </spot>
+    </light>
+
+      <!-- TRACK MODEL: A static model containing walls forming the track -->
+        <model name="zigzag_track">
+      <!-- Make the track static so it doesn't fall or move -->
+      <static>true</static>
+      <link name="track">
+
+
+  
+  <model name="turtlebot3_burger">  
+
+    <link name="base">
+
+      <inertial>
+        <pose>-0.032 0 0.070 0 0 0</pose>
+        <inertia>
+          <ixx>0.001</ixx>
+          <ixy>0.000</ixy>
+          <ixz>0.000</ixz>
+          <iyy>0.001</iyy>
+          <iyz>0.000</iyz>
+          <izz>0.001</izz>
+        </inertia>
+        <mass>1.0</mass>
+      </inertial>
+
+      <collision name="base_collision">
+        <pose>-0.032 0 0.070 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.140 0.140 0.140</size>
+          </box>
+        </geometry>
+      </collision>
+
+     <visual name="base_visual">
+        <pose>-0.032 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>meshes/burger_base.stl</uri>
+            <scale>.001 .001 .001</scale>
+          </mesh>
+        </geometry>
+         <material>
+            <ambient>0.9 0.1 0 1</ambient>
+            <diffuse>0.9 0.1 0 1</diffuse>
+            <specular>0.9 0.2 0.2 1</specular>
+            <emissive>0.9 0 0.1 1</emissive>
+          </material>
+      </visual>
+
+      <collision name="caster_collision">
+        <pose>-0.081 0 -0.004 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.005000</radius>
+          </sphere>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>100000.0</mu>
+              <mu2>100000.0</mu2>
+              <fdir1>0 0 0</fdir1>
+              <slip1>0</slip1>
+              <slip2>0</slip2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+
+    <sensor name="imu_sensor" type="imu">
+    <update_rate>50</update_rate>
+    <topic>/imu</topic>
+    <imu>
+      <angular_velocity>
+        <x>true</x>
+        <y>true</y>
+        <z>true</z>
+      </angular_velocity>
+      <linear_acceleration>
+        <x>true</x>
+        <y>true</y>
+        <z>true</z>
+      </linear_acceleration>
+      <orientation>
+        <x>true</x>
+        <y>true</y>
+        <z>true</z>
+      </orientation>
+    </imu>
+  </sensor>
+
+  <!-- <sensor name="rtk_gps" type="gps">
+    <pose>0 0 1 0 0 0</pose> 
+    <gps>
+      <horizontal>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev> 
+        </noise>
+      </horizontal>
+      <vertical>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.015</stddev>
+        </noise>
+      </vertical>
+    </gps>
+
+
+  </sensor> -->
+
+
+
+<!-- *********************** ULTRASONIC SENSORS ************************ -->
+<!-- Front Ultrasonic -->
+<link name="ultrasonic_front_link">
+  <pose>0.09 0 0.595 0 0 0</pose>  <!-- Front center position -->
+  <sensor name="ultrasonic_front" type="ray">
+    <always_on>true</always_on>
+    <visualize>true</visualize>
+    <update_rate>5</update_rate>
+    <ray>
+      <!-- Same scan/range configuration as your snippet -->
+    </ray>
+    <plugin name="ultrasonic_sensor_front" filename="libgazebo_ros_ray_sensor.so">
+      <ros>
+        <remapping>~/out:=/ultrasonic/front</remapping>
+      </ros>
+      <output_type>sensor_msgs/Range</output_type>
+      <radiation_type>ultrasound</radiation_type>
+      <frame_name>ultrasonic_front_link</frame_name>
+    </plugin>
+  </sensor>  
+</link>
+
+<!-- Left Ultrasonic -->
+<link name="ultrasonic_left_link">
+  <pose>0.0 0.139 0.595 0 0 1.5708</pose>  <!-- Left side, 90° rotation -->
+  <sensor name="ultrasonic_left" type="ray">
+    <!-- Same configuration -->
+    <plugin name="ultrasonic_sensor_left" filename="libgazebo_ros_ray_sensor.so">
+      <ros>
+        <remapping>~/out:=/ultrasonic/left</remapping>
+      </ros>
+      <output_type>sensor_msgs/Range</output_type>
+      <radiation_type>ultrasound</radiation_type>
+      <frame_name>ultrasonic_left_link</frame_name>
+    </plugin>
+  </sensor>  
+</link>
+
+<!-- Right Ultrasonic -->
+<link name="ultrasonic_right_link">
+  <pose>0.0 -0.139 0.595 0 0 -1.5708</pose>  <!-- Right side, -90° rotation -->
+  <sensor name="ultrasonic_right" type="ray">
+    <!-- Same configuration -->
+    <plugin name="ultrasonic_sensor_right" filename="libgazebo_ros_ray_sensor.so">
+      <ros>
+        <remapping>~/out:=/ultrasonic/right</remapping>
+      </ros>
+      <output_type>sensor_msgs/Range</output_type>
+      <radiation_type>ultrasound</radiation_type>
+      <frame_name>ultrasonic_right_link</frame_name>
+    </plugin>
+  </sensor>  
+</link>
+
+
+
+
+    </link>
+
+    
+
+  <!-- <link name="lidar">
+    <inertial>
+      <pose>-0.020 0 0.161 0 0 0</pose>
+      <inertia>
+        <ixx>0.001</ixx>
+        <ixy>0.000</ixy>
+        <ixz>0.000</ixz>
+        <iyy>0.001</iyy>
+        <iyz>0.000</iyz>
+        <izz>0.001</izz>
+      </inertia>
+      <mass>0.125</mass>
+    </inertial>
+
+    <collision name="lidar_sensor_collision">
+        <pose>-0.020 0 0.161 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.0508</radius>
+            <length>0.055</length>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <visual name="lidar_sensor_visual">
+        <pose>-0.032 0 0.171 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>meshes/lds.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+        <material>
+            <ambient>0.5 0.75 0 1</ambient>
+            <diffuse>0.7 0.9 0 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0.1 0 0.1 1</emissive>
+          </material>
+      </visual>
+
+      <sensor name="hls_lfcd_lds" type="gpu_ray">
+        <always_on>1</always_on>
+        <topic>/scan</topic>
+        <visualize>0</visualize>
+        <pose>-0.032 0 0.171 0 0 0</pose>
+        <update_rate>1800</update_rate>
+        <ray>
+          <scan>
+            <horizontal>
+              <samples>360</samples>
+              <resolution>1.000000</resolution>
+              <min_angle>0.000000</min_angle>
+              <max_angle>6.280000</max_angle>
+            </horizontal>
+          </scan>
+          <range>
+            <min>0.150000</min>
+            <max>3.5</max>
+            <resolution>0.015000</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </ray>
+      </sensor>
+    </link> -->
+
+    <link name="left_wheel">
+
+      <inertial>
+        <pose>0 0.08 0.023 -1.57 0 0</pose>
+        <inertia>
+          <ixx>0.001</ixx>
+          <ixy>0.000</ixy>
+          <ixz>0.000</ixz>
+          <iyy>0.001</iyy>
+          <iyz>0.000</iyz>
+          <izz>0.001</izz>
+        </inertia>
+        <mass>0.1</mass>
+      </inertial>
+
+      <collision name="left_wheel_collision">
+        <pose>0 0.08 0.023 -1.57 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.033</radius>
+            <length>0.018</length>
+          </cylinder>
+        </geometry>
+          <surface>
+          <!-- This friction pamareter don't contain reliable data!! -->
+            <friction>
+              <ode>
+                <mu>1.0</mu>
+                <mu2>1.0</mu2>
+                <fdir1>0 0 0</fdir1>
+                <slip1>0.0</slip1>
+                <slip2>0.0</slip2>
+              </ode>
+          </friction>
+        </surface>
+      </collision>
+
+      <visual name="left_wheel_visual">
+        <pose>0 0.08 0.023 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>meshes/left_tire.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+        <material>
+            <ambient>0.1 0.1 0.1 1</ambient>
+            <diffuse>0.1 0.1 0.1 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+            <emissive>0.1 0.1 0.1 1</emissive>
+          </material>
+      </visual>
+    </link>
+
+    <link name="right_wheel">
+
+      <inertial>
+        <pose>0.0 -0.08 0.023 -1.57 0 0</pose>
+        <inertia>
+          <ixx>0.001</ixx>
+          <ixy>0.000</ixy>
+          <ixz>0.000</ixz>
+          <iyy>0.001</iyy>
+          <iyz>0.000</iyz>
+          <izz>0.001</izz>
+        </inertia>
+        <mass>0.1</mass>
+      </inertial>
+    
+      <collision name="right_wheel_collision">
+        <pose>0.0 -0.08 0.023 -1.57 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.033</radius>
+            <length>0.018</length>
+          </cylinder>
+        </geometry>
+          <surface>
+          <!-- This friction pamareter don't contain reliable data!! -->
+            <friction>
+              <ode>
+                <mu>1.0</mu>
+                <mu2>1.0</mu2>
+                <fdir1>0 0 0</fdir1>
+                <slip1>0.0</slip1>
+                <slip2>0.0</slip2>
+              </ode>
+          </friction>
+        </surface>
+      </collision>
+
+      <visual name="right_wheel_visual">
+        <pose>0.0 -0.08 0.023 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>meshes/right_tire.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+          <material>
+            <ambient>0.1 0.1 0.1 1</ambient>
+            <diffuse>0.1 0.1 0.1 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+            <emissive>0.1 0.1 0.1 1</emissive>
+          </material>
+      </visual>
+    </link>
+
+    <joint name="left_wheel_joint" type="revolute">
+      <parent>base</parent>
+      <child>left_wheel</child>
+      <pose>0.0 0.08 0.023 -1.57 0 0</pose>
+      <axis>
+        <xyz>0 0 1</xyz>
+      </axis>
+    </joint>
+
+    <joint name="right_wheel_joint" type="revolute">
+      <parent>base</parent>
+      <child>right_wheel</child>
+      <pose>0.0 -0.08 0.023 -1.57 0 0</pose>
+      <axis>
+        <xyz>0 0 1</xyz>
+      </axis>
+    </joint>
+
+    <!-- <joint name="lidar_joint" type="fixed">
+      <parent>base</parent>
+      <child>lidar</child>
+      <pose>-0.032 0 0.171 0 0 0</pose>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <use_parent_model_frame>true</use_parent_model_frame>
+      </axis>
+    </joint> -->
+    
+
+   <!-- DIFF DRIVE PLUGIN / WHEELS CONTROLER -->
+    <plugin filename="ignition-gazebo-diff-drive-system" name="ignition::gazebo::systems::DiffDrive">
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+      <wheel_separation>0.6851</wheel_separation>
+      <wheel_radius>0.1651</wheel_radius>
+      <odom_publish_frequency>1</odom_publish_frequency>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base</child_frame_id>
+      <topic>/cmd_vel</topic>
+    </plugin>
+
+    <!-- <plugin name="gps_plugin" filename="libgazebo_ros_gps.so">
+      <ros>
+        <namespace>/rtk_robot</namespace>
+        <remapping>~/fix:=/rtk_gps/fix</remapping>
+      </ros>
+      <update_rate>10.0</update_rate> 
+      <frame_name>rtk_gps_link</frame_name>
+    </plugin> -->
+
+    <!-- <plugin name='gps_plugin' filename='libignition-gazebo-navsat-system.so'>
+      <alwaysOn>true</alwaysOn>
+      <updateRate>0.0</updateRate>
+      <topicName>gps</topicName>
+      <frameName>gps_frame</frameName>
+      <lat>47.397742</lat>
+      <lon>8.545594</lon>
+      <alt>488.0</alt>
+    </plugin> -->
+    
+    <plugin filename="ignition-gazebo-navsat-system" name="ignition::gazebo::systems::NavSat"/>
+    <link name="gps_link">
+      <sensor name="navsat_sensor" type="navsat">
+        <always_on>1</always_on>
+        <update_rate>1</update_rate>
+        <topicName>/gps</topicName>
+        <frameName>rtk_gps_link</frameName>
+        <lat>47.397742</lat>
+        <lon>8.545594</lon>
+        <alt>488.0</alt>
+      </sensor>
+    </link>
+
+  <static>0</static>
+  </model>
+  </world>
+</sdf>

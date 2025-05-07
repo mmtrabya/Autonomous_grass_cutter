@@ -1,0 +1,16 @@
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/lib/boundary_publisher/boundary_publisher
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/ament_index/resource_index/package_run_dependencies/boundary_publisher
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/ament_index/resource_index/parent_prefix_path/boundary_publisher
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/ament_prefix_path.sh
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/ament_prefix_path.dsv
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/path.sh
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/path.dsv
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.bash
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.sh
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.zsh
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.dsv
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/package.dsv
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/ament_index/resource_index/packages/boundary_publisher
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/cmake/boundary_publisherConfig.cmake
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/cmake/boundary_publisherConfig-version.cmake
+/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/package.xml

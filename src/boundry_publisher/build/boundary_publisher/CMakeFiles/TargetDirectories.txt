@@ -1,0 +1,10 @@
+/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher/CMakeFiles/uninstall.dir
+/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher/CMakeFiles/boundary_publisher_uninstall.dir
+/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher/CMakeFiles/boundary_publisher.dir
+/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher/CMakeFiles/test.dir
+/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher/CMakeFiles/edit_cache.dir
+/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher/CMakeFiles/rebuild_cache.dir
+/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher/CMakeFiles/list_install_components.dir
+/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher/CMakeFiles/install.dir
+/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher/CMakeFiles/install/local.dir
+/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher/CMakeFiles/install/strip.dir

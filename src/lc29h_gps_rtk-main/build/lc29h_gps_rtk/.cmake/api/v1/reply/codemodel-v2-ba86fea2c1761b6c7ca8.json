@@ -1,0 +1,79 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-2333d07e22a7163b4935.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"name" : "",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "lc29h_gps_rtk",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "lc29h_gps_rtk_node::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-lc29h_gps_rtk_node-08838857507ce2879046.json",
+					"name" : "lc29h_gps_rtk_node",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "lc29h_gps_rtk_uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-lc29h_gps_rtk_uninstall-f8b12c0b4c0ed7188c2c.json",
+					"name" : "lc29h_gps_rtk_uninstall",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-uninstall-437ae501e3e836ae92e3.json",
+					"name" : "uninstall",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/kemo/Azza_ws/src/lc29h_gps_rtk-main/build/lc29h_gps_rtk",
+		"source" : "/home/kemo/Azza_ws/src/lc29h_gps_rtk-main"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

@@ -1,0 +1,79 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-950d3c3592d53526160f.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"name" : "",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "lib_hcsr04_ros",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "RunUltrasonicHCSR04Wrapper::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-RunUltrasonicHCSR04Wrapper-1ea15e623a5ba9f2e5a6.json",
+					"name" : "RunUltrasonicHCSR04Wrapper",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "lib_hcsr04_ros_uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-lib_hcsr04_ros_uninstall-30d9d707c4b1f9edba93.json",
+					"name" : "lib_hcsr04_ros_uninstall",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-uninstall-235aca6637c8a2c56c36.json",
+					"name" : "uninstall",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/dell/Project_ws/libHCSR04/libHCSR04_ros/build/lib_hcsr04_ros",
+		"source" : "/home/dell/Project_ws/libHCSR04/libHCSR04_ros"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

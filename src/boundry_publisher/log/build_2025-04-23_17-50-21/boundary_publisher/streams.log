@@ -1,0 +1,26 @@
+[0.009s] Invoking command in '/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/kemo/ros_ws/install/my_py_pkg:/opt/ros/humble /usr/bin/cmake --build /home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher -- -j16 -l16
+[0.044s] [35m[1mConsolidate compiler generated dependencies of target boundary_publisher[0m
+[0.060s] [ 50%] [32mBuilding CXX object CMakeFiles/boundary_publisher.dir/src/boundary_publisher.cpp.o[0m
+[3.084s] [100%] [32m[1mLinking CXX executable boundary_publisher[0m
+[3.220s] [100%] Built target boundary_publisher
+[3.230s] Invoked command in '/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/kemo/ros_ws/install/my_py_pkg:/opt/ros/humble /usr/bin/cmake --build /home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher -- -j16 -l16
+[3.241s] Invoking command in '/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/kemo/ros_ws/install/my_py_pkg:/opt/ros/humble /usr/bin/cmake --install /home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher
+[3.247s] -- Install configuration: ""
+[3.248s] -- Installing: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/lib/boundary_publisher/boundary_publisher
+[3.249s] -- Set runtime path of "/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/lib/boundary_publisher/boundary_publisher" to ""
+[3.249s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/ament_index/resource_index/package_run_dependencies/boundary_publisher
+[3.249s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/ament_index/resource_index/parent_prefix_path/boundary_publisher
+[3.249s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/ament_prefix_path.sh
+[3.249s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/ament_prefix_path.dsv
+[3.249s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/path.sh
+[3.249s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/path.dsv
+[3.249s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.bash
+[3.250s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.sh
+[3.250s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.zsh
+[3.250s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.dsv
+[3.250s] -- Installing: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/package.dsv
+[3.250s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/ament_index/resource_index/packages/boundary_publisher
+[3.250s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/cmake/boundary_publisherConfig.cmake
+[3.250s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/cmake/boundary_publisherConfig-version.cmake
+[3.250s] -- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/package.xml
+[3.252s] Invoked command in '/home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/kemo/ros_ws/install/my_py_pkg:/opt/ros/humble /usr/bin/cmake --install /home/kemo/Azza_ws/src/boundry_publisher/build/boundary_publisher

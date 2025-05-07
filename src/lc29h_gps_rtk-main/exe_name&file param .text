@@ -1,0 +1,26 @@
+ lc29h_gps_rtk_node
+  
+  --------------------------------------
+  ros2 launch lc29h_gps_rtk lc29h_gps_rtk.launch.py \
+  ip:=192.168.1.100 \
+  port:=2101 \
+  user:=demo \
+  passwd:=demo123 \
+  mountpoint:=MY_MOUNT \
+  latitude:=29.9765 \
+  longitude:=31.1313 \
+  gga_num:=18
+------------------------------
+description 
+
+ros2 launch lc29h_gps_rtk lc29h_gps_rtk.launch.py \
+  ip:=192.168.1.100       # Address of the NTRIP caster server providing RTK corrections :contentReference[oaicite:0]{index=0} \
+  port:=2101              # TCP port on which the NTRIP caster listens :contentReference[oaicite:1]{index=1} \
+  user:=demo              # Username for authenticating with the NTRIP caster (if required) :contentReference[oaicite:2]{index=2} \
+  passwd:=demo123         # Password for the NTRIP caster (if required) :contentReference[oaicite:3]{index=3} \
+  mountpoint:=MY_MOUNT    # Mount point name of the correction stream on the caster :contentReference[oaicite:4]{index=4} \
+  latitude:=29.9765       # Rover’s latitude (decimal degrees) sent in the GGA sentence :contentReference[oaicite:5]{index=5} \
+  longitude:=31.1313      # Rover’s longitude (decimal degrees) sent in the GGA sentence :contentReference[oaicite:6]{index=6} \
+  gga_num:=18             # Minimum number of satellites in GGA before publishing fixes :contentReference[oaicite:7]{index=7}
+
+

@@ -1,0 +1,22 @@
+[35m[1mConsolidate compiler generated dependencies of target boundary_publisher[0m
+[ 50%] [32mBuilding CXX object CMakeFiles/boundary_publisher.dir/src/boundary_publisher.cpp.o[0m
+[100%] [32m[1mLinking CXX executable boundary_publisher[0m
+[100%] Built target boundary_publisher
+-- Install configuration: ""
+-- Installing: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/lib/boundary_publisher/boundary_publisher
+-- Set runtime path of "/home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/lib/boundary_publisher/boundary_publisher" to ""
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/ament_index/resource_index/package_run_dependencies/boundary_publisher
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/ament_index/resource_index/parent_prefix_path/boundary_publisher
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/ament_prefix_path.sh
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/ament_prefix_path.dsv
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/path.sh
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/environment/path.dsv
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.bash
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.sh
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.zsh
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/local_setup.dsv
+-- Installing: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/package.dsv
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/ament_index/resource_index/packages/boundary_publisher
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/cmake/boundary_publisherConfig.cmake
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/cmake/boundary_publisherConfig-version.cmake
+-- Up-to-date: /home/kemo/Azza_ws/src/boundry_publisher/install/boundary_publisher/share/boundary_publisher/package.xml
