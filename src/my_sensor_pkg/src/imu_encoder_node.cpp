@@ -30,6 +30,23 @@
 
 using namespace std::chrono_literals;
 
+// Global variables for encoder counts to be used by the ISR
+volatile int g_left_ticks = 0;
+volatile int g_right_ticks = 0;
+
+// ISR functions for encoder interrupts
+void encoder_left_isr() {
+  bool a = digitalRead(ENCODER_LEFT_A);
+  bool b = digitalRead(ENCODER_LEFT_B);
+  g_left_ticks += (a == b) ? 1 : -1;
+}
+
+void encoder_right_isr() {
+  bool a = digitalRead(ENCODER_RIGHT_A);
+  bool b = digitalRead(ENCODER_RIGHT_B);
+  g_right_ticks += (a != b) ? 1 : -1;
+}
+
 class SensorDriver : public rclcpp::Node {
 public:
   SensorDriver() : Node("sensor_driver") {
@@ -110,7 +127,10 @@ private:
 
   bool init_encoders() {
     try {
-      wiringPiSetupGpio();
+      if (wiringPiSetupGpio() == -1) {
+        RCLCPP_ERROR(get_logger(), "Failed to initialize WiringPi GPIO");
+        return false;
+      }
       
       // Setup encoder pins
       pinMode(ENCODER_LEFT_A, INPUT); pullUpDnControl(ENCODER_LEFT_A, PUD_UP);
@@ -118,9 +138,21 @@ private:
       pinMode(ENCODER_RIGHT_A, INPUT); pullUpDnControl(ENCODER_RIGHT_A, PUD_UP);
       pinMode(ENCODER_RIGHT_B, INPUT); pullUpDnControl(ENCODER_RIGHT_B, PUD_UP);
       
+      // Read initial values
+      RCLCPP_INFO(get_logger(), "Initial encoder readings - Left A: %d, B: %d, Right A: %d, B: %d",
+                  digitalRead(ENCODER_LEFT_A), digitalRead(ENCODER_LEFT_B),
+                  digitalRead(ENCODER_RIGHT_A), digitalRead(ENCODER_RIGHT_B));
+      
       // Setup interrupt service routines
-      wiringPiISR(ENCODER_LEFT_A, INT_EDGE_BOTH, &SensorDriver::encoder_left_isr);
-      wiringPiISR(ENCODER_RIGHT_A, INT_EDGE_BOTH, &SensorDriver::encoder_right_isr);
+      if (wiringPiISR(ENCODER_LEFT_A, INT_EDGE_BOTH, &encoder_left_isr) < 0) {
+        RCLCPP_ERROR(get_logger(), "Failed to set up left encoder ISR");
+        return false;
+      }
+      
+      if (wiringPiISR(ENCODER_RIGHT_A, INT_EDGE_BOTH, &encoder_right_isr) < 0) {
+        RCLCPP_ERROR(get_logger(), "Failed to set up right encoder ISR");
+        return false;
+      }
       
       RCLCPP_INFO(get_logger(), "Encoders initialized successfully");
       return true;
@@ -130,29 +162,14 @@ private:
     }
   }
 
-  // Static ISR functions and atomic counters for thread safety
-  static void encoder_left_isr() {
-    static std::atomic<int> left_ticks(0);
-    bool a = digitalRead(ENCODER_LEFT_A);
-    bool b = digitalRead(ENCODER_LEFT_B);
-    left_ticks_ += (a == b) ? 1 : -1;
-  }
-  
-  static void encoder_right_isr() {
-    static std::atomic<int> right_ticks(0);
-    bool a = digitalRead(ENCODER_RIGHT_A);
-    bool b = digitalRead(ENCODER_RIGHT_B);
-    right_ticks_ += (a != b) ? 1 : -1;
-  }
-
-    int16_t read_word_2c(int addr) {
+  int16_t read_word_2c(int addr) {
     uint16_t high = wiringPiI2CReadReg8(fd_, addr);
     uint16_t low = wiringPiI2CReadReg8(fd_, addr + 1);
     uint16_t value = (high << 8) | low;
     
     // Convert to signed 16-bit integer
     return static_cast<int16_t>(value);
-}
+  }
 
   // Convert euler angles to quaternion
   geometry_msgs::msg::Quaternion euler_to_quaternion(double roll, double pitch, double yaw) {
@@ -234,14 +251,26 @@ private:
     // --------------------------
     // Read and publish odometry
     // --------------------------
-    int ticks_diff_left = left_ticks_ - last_left_ticks_;
-    int ticks_diff_right = right_ticks_ - last_right_ticks_;
-    last_left_ticks_ = left_ticks_;
-    last_right_ticks_ = right_ticks_;
+    // Read current encoder values from global variables
+    int current_left_ticks = g_left_ticks;
+    int current_right_ticks = g_right_ticks;
+    
+    int ticks_diff_left = current_left_ticks - last_left_ticks_;
+    int ticks_diff_right = current_right_ticks - last_right_ticks_;
+    
+    // Update stored values
+    last_left_ticks_ = current_left_ticks;
+    last_right_ticks_ = current_right_ticks;
+    
+    // Log encoder ticks if they've changed
+    if (ticks_diff_left != 0 || ticks_diff_right != 0) {
+      RCLCPP_DEBUG(get_logger(), "Encoder ticks - Left: %d (%d diff), Right: %d (%d diff)",
+                 current_left_ticks, ticks_diff_left, current_right_ticks, ticks_diff_right);
+    }
     
     // Calculate wheel velocities
-    double left_dist = (ticks_diff_left / encoder_resolution_) * 2 * M_PI * wheel_radius_;
-    double right_dist = (ticks_diff_right / encoder_resolution_) * 2 * M_PI * wheel_radius_;
+    double left_dist = (ticks_diff_left / static_cast<double>(encoder_resolution_)) * 2 * M_PI * wheel_radius_;
+    double right_dist = (ticks_diff_right / static_cast<double>(encoder_resolution_)) * 2 * M_PI * wheel_radius_;
     
     double left_vel = left_dist / dt;
     double right_vel = right_dist / dt;
@@ -301,8 +330,6 @@ private:
 
   // Hardware variables
   int fd_;
-  static std::atomic<int> left_ticks_;
-  static std::atomic<int> right_ticks_;
   int last_left_ticks_, last_right_ticks_;
   double wheel_radius_, wheel_base_;
   int encoder_resolution_;
@@ -320,10 +347,6 @@ private:
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
-
-// Initialize static member variables
-std::atomic<int> SensorDriver::left_ticks_(0);
-std::atomic<int> SensorDriver::right_ticks_(0);
 
 int main(int argc, char** argv) {
   rclcpp::init(argc, argv);
