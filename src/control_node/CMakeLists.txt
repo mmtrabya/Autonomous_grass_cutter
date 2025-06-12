@@ -9,6 +9,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(serial REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -23,8 +25,10 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(control_node src/control_node.cpp)
+ament_target_dependencies(control_node rclcpp geometry_msgs nav_msgs serial)
+install(TARGETS velocity_control_node DESTINATION lib/${PROJECT_NAME})
 
-ament_target_dependencies(control_node rclcpp geometry_msgs)
+
 
 install(TARGETS
   control_node
