@@ -25,7 +25,9 @@ public:
           previous_angular_error_(0.0),
           integral_linear_error_(0.0),
           integral_angular_error_(0.0),
-          wheel_base_(0.3)
+          wheel_base_(0.3),
+          last_left_pwm_(0),
+          last_right_pwm_(0)
     {
         RCLCPP_INFO(this->get_logger(), "ControlNode started.");
 
@@ -115,11 +117,20 @@ private:
         int left_pwm_int = std::clamp(static_cast<int>(left_pwm), -255, 255);
         int right_pwm_int = std::clamp(static_cast<int>(right_pwm), -255, 255);
 
-        std::string command = "L" + std::to_string(left_pwm_int) +
-                              "R" + std::to_string(right_pwm_int) + "\n";
+        // Only send if values changed significantly
+        const int threshold = 5;
+        if (std::abs(left_pwm_int - last_left_pwm_) >= threshold ||
+            std::abs(right_pwm_int - last_right_pwm_) >= threshold)
+        {
+            std::string command = "L" + std::to_string(left_pwm_int) +
+                                  "R" + std::to_string(right_pwm_int) + "\n";
 
-        if (serial_fd_ >= 0) {
-            write(serial_fd_, command.c_str(), command.length());
+            if (serial_fd_ >= 0) {
+                write(serial_fd_, command.c_str(), command.length());
+            }
+
+            last_left_pwm_ = left_pwm_int;
+            last_right_pwm_ = right_pwm_int;
         }
     }
 
@@ -138,6 +149,9 @@ private:
     double current_linear_velocity_;
     double current_angular_velocity_;
     double wheel_base_;
+
+    int last_left_pwm_;
+    int last_right_pwm_;
 };
 
 int main(int argc, char *argv[])
@@ -147,4 +161,3 @@ int main(int argc, char *argv[])
     rclcpp::shutdown();
     return 0;
 }
-
