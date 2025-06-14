@@ -11,6 +11,7 @@
 #include <cstring>
 
 using namespace std::chrono_literals;
+using namespace std::chrono;
 
 class ControlNode : public rclcpp::Node
 {
@@ -27,7 +28,8 @@ public:
           integral_angular_error_(0.0),
           wheel_base_(0.3),
           last_left_pwm_(0),
-          last_right_pwm_(0)
+          last_right_pwm_(0),
+          last_send_time_(steady_clock::now())
     {
         RCLCPP_INFO(this->get_logger(), "ControlNode started.");
 
@@ -117,10 +119,15 @@ private:
         int left_pwm_int = std::clamp(static_cast<int>(left_pwm), -255, 255);
         int right_pwm_int = std::clamp(static_cast<int>(right_pwm), -255, 255);
 
-        // Only send if values changed significantly
-        const int threshold = 5;
-        if (std::abs(left_pwm_int - last_left_pwm_) >= threshold ||
-            std::abs(right_pwm_int - last_right_pwm_) >= threshold)
+        auto now = steady_clock::now();
+        auto elapsed = duration_cast<milliseconds>(now - last_send_time_);
+
+        const int threshold = 5;             // Minimum change to trigger new command
+        const int cooldown_ms = 300;         // Min time between serial sends
+
+        if ((std::abs(left_pwm_int - last_left_pwm_) >= threshold ||
+             std::abs(right_pwm_int - last_right_pwm_) >= threshold) &&
+            elapsed.count() >= cooldown_ms)
         {
             std::string command = "L" + std::to_string(left_pwm_int) +
                                   "R" + std::to_string(right_pwm_int) + "\n";
@@ -129,6 +136,7 @@ private:
                 write(serial_fd_, command.c_str(), command.length());
             }
 
+            last_send_time_ = now;
             last_left_pwm_ = left_pwm_int;
             last_right_pwm_ = right_pwm_int;
         }
@@ -152,6 +160,7 @@ private:
 
     int last_left_pwm_;
     int last_right_pwm_;
+    std::chrono::steady_clock::time_point last_send_time_;
 };
 
 int main(int argc, char *argv[])
