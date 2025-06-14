@@ -1,4 +1,3 @@
-# spiral_motion/spiral_motion/spiral_node.py
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, PoseWithCovarianceStamped
@@ -101,14 +100,17 @@ class SpiralMotionNode(Node):
         # Boundary corners (will be calculated once center is set)
         self.boundary_corners = []
         self.current_target_corner = 0
-        self.boundary_size = 1.0  # meters from center
+        self.boundary_size = 2.0  # Changed from 1.0 to 2.0 meters from center
         self.boundary_tolerance = 0.10  # 10 cm tolerance
         
         # Spiral completion tracking
         self.corners_reached = [False, False, False, False]
         self.spiral_complete = False
         
-        # No PID controllers needed - always use maximum speeds for low torque motors
+        # Initial position for center point
+        self.first_position_received = False
+        self.initial_x = None
+        self.initial_y = None
         
         # Position correction parameters
         self.position_error_threshold = 0.15  # meters
@@ -119,7 +121,7 @@ class SpiralMotionNode(Node):
         # Create timer
         self.timer = self.create_timer(self.update_rate, self.timer_callback)
 
-        self.get_logger().info('Spiral motion node with boundary correction has been started')
+        self.get_logger().info('Spiral motion node with 2-meter boundary started')
 
         # Publish an initial zero message
         zero_twist = Twist()
@@ -136,6 +138,17 @@ class SpiralMotionNode(Node):
         qz = msg.pose.pose.orientation.z
         qw = msg.pose.pose.orientation.w
         current_yaw = math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz))
+        
+        # Save first position as initial and center point
+        if not self.first_position_received:
+            self.initial_x = self.current_x
+            self.initial_y = self.current_y
+            self.center_x = self.initial_x
+            self.center_y = self.initial_y
+            self.setup_boundary_corners()
+            self.first_position_received = True
+            self.get_logger().info(f'Initial position set: x={self.initial_x:.2f}, y={self.initial_y:.2f}')
+            self.get_logger().info(f'Center position set: x={self.center_x:.2f}, y={self.center_y:.2f}')
         
         # Optional: Check pose quality from covariance
         # Position uncertainty (x, y variances)
@@ -190,20 +203,13 @@ class SpiralMotionNode(Node):
         
         self.current_yaw = current_yaw
         self.previous_yaw = current_yaw
-        
-        # Set center position if not set (first pose reading)
-        if self.center_x is None:
-            self.center_x = self.current_x
-            self.center_y = self.current_y
-            self.setup_boundary_corners()
-            self.get_logger().info(f'Center position set: x={self.center_x:.2f}, y={self.center_y:.2f}')
 
     def setup_boundary_corners(self):
-        """Setup the four boundary corners based on center position"""
+        """Setup the four boundary corners based on center position with 2m distance"""
         if self.center_x is None or self.center_y is None:
             return
             
-        # Define corners: [x+1, y+1], [x-1, y+1], [x-1, y-1], [x+1, y-1]
+        # Define corners: [x+2, y+2], [x-2, y+2], [x-2, y-2], [x+2, y-2]
         self.boundary_corners = [
             (self.center_x + self.boundary_size, self.center_y + self.boundary_size),  # Top-right
             (self.center_x - self.boundary_size, self.center_y + self.boundary_size),  # Top-left
@@ -211,7 +217,9 @@ class SpiralMotionNode(Node):
             (self.center_x + self.boundary_size, self.center_y - self.boundary_size)   # Bottom-right
         ]
         
-        self.get_logger().info(f'Boundary corners set: {self.boundary_corners}')
+        self.get_logger().info(f'Boundary corners set with 2m distance:')
+        for i, corner in enumerate(self.boundary_corners):
+            self.get_logger().info(f'  Corner {i+1}: ({corner[0]:.2f}, {corner[1]:.2f})')
 
     def check_corner_reached(self, corner_idx):
         """Check if robot has reached a specific corner within tolerance"""
@@ -242,7 +250,8 @@ class SpiralMotionNode(Node):
     def calculate_expected_position(self):
         """Calculate expected position based on spiral pattern"""
         # Simple spiral calculation based on revolutions and angular position
-        radius = self.initial_linear_speed * (self.revolutions_completed + 1) * 0.1
+        initial_radius = 0.1  # Initial radius
+        radius = initial_radius * (self.revolutions_completed + 1)
         angle = self.current_yaw
         
         expected_x = self.center_x + radius * math.cos(angle)
@@ -306,7 +315,7 @@ class SpiralMotionNode(Node):
 
     def timer_callback(self):
         # Skip if we don't have pose data yet
-        if self.center_x is None:
+        if not self.first_position_received:
             self.get_logger().info('Waiting for initial pose data...')
             return
 
@@ -337,12 +346,21 @@ class SpiralMotionNode(Node):
         self.publisher_.publish(twist_msg)
 
         # Log current status
-        distance_from_center = math.sqrt((self.current_x - self.center_x)**2 + (self.current_y - self.center_y)**2)
+        distance_from_center = math.sqrt(
+            (self.current_x - self.center_x)**2 + 
+            (self.current_y - self.center_y)**2
+        )
+        
+        # Log current status with information about corners reached
+        corners_status = ' '.join([
+            f"C{i+1}:{'✓' if reached else '✗'}" 
+            for i, reached in enumerate(self.corners_reached)
+        ])
         
         self.get_logger().info(
             f'Rev: {self.revolutions_completed} | Command: lin={twist_msg.linear.x:.3f}, ang={twist_msg.angular.z:.3f} | ' +
             f'Pos: x={self.current_x:.2f}, y={self.current_y:.2f} | Dist from center: {distance_from_center:.2f}m | ' +
-            f'Correction: {"ACTIVE" if self.correction_active else "OFF"}'
+            f'Corners: {corners_status} | Correction: {"ON" if self.correction_active else "OFF"}'
         )
 
 def main(args=None):
