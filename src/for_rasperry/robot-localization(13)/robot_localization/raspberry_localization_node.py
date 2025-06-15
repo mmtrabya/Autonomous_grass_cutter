@@ -1,344 +1,325 @@
-# spiral_motion/spiral_motion/spiral_node.py
+#!/usr/bin/env python3
+
+# Apply NumPy compatibility fix first
+import numpy as np
+if not hasattr(np, 'float'):
+    np.float = float
+
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist, PoseWithCovarianceStamped
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from geometry_msgs.msg import PoseWithCovarianceStamped, TransformStamped
+from sensor_msgs.msg import Imu
+from nav_msgs.msg import Odometry
+from tf2_ros import TransformBroadcaster
+import tf_transformations
 import math
-import time
 
-class PIDController:
-    def __init__(self, kp, ki, kd, output_min, output_max, filter_coefficient=0.2):
-        self.kp = kp
-        self.ki = ki
-        self.kd = kd
-        self.output_min = output_min
-        self.output_max = output_max
-        self.filter_coefficient = filter_coefficient
-        self.filtered_output = 0.0
-        self.last_derivative = 0.0
-        self.derivative_filter = 0.5
-        
-        self.previous_error = 0.0
-        self.integral = 0.0
-        self.last_time = time.time()
+class RaspberryLocalizationNode(Node):
+    """
+    Localization node that subscribes to Raspberry Pi topics:
+    - /wheel/odom (nav_msgs/Odometry) - wheel encoder data
+    - /imu_data (sensor_msgs/Imu) - IMU sensor data
     
-    def compute(self, setpoint, measured_value):
-        # Calculate time since last computation
-        current_time = time.time()
-        dt = current_time - self.last_time
-        
-        # Avoid division by zero or very small dt
-        if dt < 0.001:
-            dt = 0.001
-            
-        # Calculate error
-        error = setpoint - measured_value
-        
-        # Calculate integral term with anti-windup
-        self.integral += error * dt
-        
-        # Calculate and filter derivative term
-        raw_derivative = (error - self.previous_error) / dt
-        self.last_derivative = (self.derivative_filter * raw_derivative) + ((1 - self.derivative_filter) * self.last_derivative)
-        
-        # Calculate raw output
-        raw_output = (self.kp * error) + (self.ki * self.integral) + (self.kd * self.last_derivative)
-        
-        # Apply low-pass filter
-        self.filtered_output = (self.filter_coefficient * raw_output) + ((1 - self.filter_coefficient) * self.filtered_output)
-        
-        # Clamp output to limits
-        output = max(self.output_min, min(self.filtered_output, self.output_max))
-        
-        # Enhanced anti-windup
-        if output >= self.output_max:
-            self.integral -= error * dt
-        elif output <= self.output_min:
-            self.integral += error * dt
-        
-        # Save values for next computation
-        self.previous_error = error
-        self.last_time = current_time
-        
-        return output
+    Uses Extended Kalman Filter for optimal sensor fusion
+    """
     
-    def reset(self):
-        self.previous_error = 0.0
-        self.integral = 0.0
-        self.filtered_output = 0.0
-        self.last_derivative = 0.0
-        self.last_time = time.time()
-
-
-class SpiralMotionNode(Node):
     def __init__(self):
-        super().__init__('spiral_motion_node')
-
-        # Create publisher for cmd_vel topic
-        self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
+        super().__init__('raspberry_localization_node')
         
-        # Create subscriber for wheel_pose topic
-        self.wheel_pose_subscription = self.create_subscription(
+        # EKF state: [x, y, theta, vx, vy, omega]
+        self.state = np.zeros(6)
+        self.P = np.eye(6) * 0.1  # Covariance matrix
+        self.Q = np.diag([0.01, 0.01, 0.01, 0.1, 0.1, 0.1])  # Process noise
+        self.R_odom = np.diag([0.02, 0.02, 0.01])  # Wheel odometry noise
+        self.R_imu = np.diag([0.005])  # IMU noise
+        
+        # QoS profiles
+        self.sensor_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+        
+        self.reliable_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+        
+        # Subscribers for Raspberry Pi topics
+        self.wheel_odom_sub = self.create_subscription(
+            Odometry,
+            '/wheel_odom',  # Your wheel encoder topic
+            self.wheel_odom_callback,
+            self.sensor_qos
+        )
+        
+        self.imu_sub = self.create_subscription(
+            Imu,
+            '/imu_data',  # Your IMU topic
+            self.imu_callback,
+            self.sensor_qos
+        )
+        
+        # Publishers
+        self.fused_odom_pub = self.create_publisher(
+            Odometry,
+            '/localization/odometry',
+            self.reliable_qos
+        )
+        
+        self.pose_pub = self.create_publisher(
             PoseWithCovarianceStamped,
-            '/wheel_pose',
-            self.wheel_pose_callback,
-            10)
-
-        # Spiral motion parameters
-        self.desired_angular_speed = 0.5  # rad/s
-        self.initial_linear_speed = 0.1  # m/s
-        self.linear_speed_increment = 0.001  # m/s per cycle
-        self.max_linear_speed = 12  # m/s
-        self.update_rate = 0.1  # seconds
-
-        # Current target speeds
-        self.target_linear_speed = self.initial_linear_speed
+            '/localization/pose',
+            self.reliable_qos
+        )
         
-        # Actual speeds from wheel pose (calculated from position changes)
-        self.current_linear_speed = 0.0
-        self.current_angular_speed = 0.0
+        # TF broadcaster for output
+        self.tf_broadcaster = TransformBroadcaster(self)
         
-        # Previous values for velocity calculation
-        self.prev_x = None
-        self.prev_y = None
-        self.prev_yaw = None
-        self.prev_time = None
+        # Data storage
+        self.latest_wheel_odom = None
+        self.last_update_time = self.get_clock().now()
+        self.last_imu_time = self.get_clock().now()
         
-        # Odometry tracking
-        self.current_x = 0.0
-        self.current_y = 0.0
-        self.current_yaw = 0.0
-        self.start_x = None
-        self.start_y = None
-        self.distance_from_start = 0.0
+        # Timer for main fusion loop
+        self.timer = self.create_timer(0.02, self.fusion_callback)  # 50 Hz
         
-        # PID controllers
-        self.linear_pid = PIDController(kp=0.8, ki=0.1, kd=0.05, output_min=0.0, output_max=self.max_linear_speed, filter_coefficient=0.3)
-        self.angular_pid = PIDController(kp=1.0, ki=0.1, kd=0.1, output_min=-1.0, output_max=1.0, filter_coefficient=0.3)
+        self.get_logger().info('Raspberry Pi Localization Node initialized')
+        self.get_logger().info('Subscribing to:')
+        self.get_logger().info('  - /wheel_odom (nav_msgs/Odometry) - wheel encoder data')
+        self.get_logger().info('  - /imu_data (sensor_msgs/Imu) - IMU sensor data')
+        self.get_logger().info('Publishing to:')
+        self.get_logger().info('  - /localization/odometry (nav_msgs/Odometry)')
+        self.get_logger().info('  - /localization/pose (geometry_msgs/PoseWithCovarianceStamped)')
+    
+    def wheel_odom_callback(self, msg):
+        """Process wheel odometry from Raspberry Pi"""
+        self.latest_wheel_odom = msg
         
-        # Boundary parameters - will be set when initial position is known
-        self.boundary_radius = 2.0  # 2 meters in each direction from center
-        self.boundary_x_min = 0.0  # To be set after initialization
-        self.boundary_x_max = 0.0  # To be set after initialization
-        self.boundary_y_min = 0.0  # To be set after initialization
-        self.boundary_y_max = 0.0  # To be set after initialization
-        self.max_distance = self.boundary_radius  # Set max distance to boundary radius
+        self.get_logger().debug(
+            f'Wheel Odom: pos=({msg.pose.pose.position.x:.3f}, {msg.pose.pose.position.y:.3f}), '
+            f'vel=({msg.twist.twist.linear.x:.3f}, {msg.twist.twist.angular.z:.3f})',
+            throttle_duration_sec=2.0
+        )
+    
+    def imu_callback(self, msg):
+        """Process IMU data and update EKF prediction"""
+        current_time = self.get_clock().now()
+        dt = (current_time - self.last_imu_time).nanoseconds / 1e9
         
-        # Boundary approach parameters
-        self.boundary_slowdown_distance = 0.3  # meters
-        self.boundary_approaching = False
-
-        # Create timer
-        self.timer = self.create_timer(self.update_rate, self.timer_callback)
-
-        # Variables to track motion progress
-        self.last_radius_check_time = time.time()
-        self.radius_check_interval = 3.0  # Check every 3 seconds
-        self.last_radius = 0.0
-        self.stalled_count = 0
-
-        self.get_logger().info('Spiral motion node with PID control has been started')
-
-        # Publish an initial zero message
-        zero_twist = Twist()
-        self.publisher_.publish(zero_twist)
-        self.get_logger().info('Published initial zero command')
-
-    def wheel_pose_callback(self, msg):
-        # Extract position from wheel pose message (PoseWithCovarianceStamped)
-        self.current_x = msg.pose.pose.position.x
-        self.current_y = msg.pose.pose.position.y
-        
-        # Extract orientation and convert to yaw
-        qx = msg.pose.pose.orientation.x
-        qy = msg.pose.pose.orientation.y
-        qz = msg.pose.pose.orientation.z
-        qw = msg.pose.pose.orientation.w
-        self.current_yaw = math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz))
-        
-        # Calculate velocities from position changes
-        current_time = time.time()
-        if self.prev_x is not None and self.prev_time is not None:
-            dt = current_time - self.prev_time
-            if dt > 0.01:  # Avoid too frequent calculations
-                # Calculate linear velocity
-                dx = self.current_x - self.prev_x
-                dy = self.current_y - self.prev_y
-                self.current_linear_speed = math.sqrt(dx*dx + dy*dy) / dt
-                
-                # Calculate angular velocity
-                dyaw = self.current_yaw - self.prev_yaw
-                # Handle angle wrapping
-                if dyaw > math.pi:
-                    dyaw -= 2 * math.pi
-                elif dyaw < -math.pi:
-                    dyaw += 2 * math.pi
-                self.current_angular_speed = dyaw / dt
-                
-                # Store current values for next iteration
-                self.prev_x = self.current_x
-                self.prev_y = self.current_y
-                self.prev_yaw = self.current_yaw
-                self.prev_time = current_time
-        
-        # Store initial values if this is the first callback
-        if self.prev_x is None:
-            self.prev_x = self.current_x
-            self.prev_y = self.current_y
-            self.prev_yaw = self.current_yaw
-            self.prev_time = current_time
-        
-        # Set initial position if not set and define boundaries based on it
-        if self.start_x is None:
-            self.start_x = self.current_x
-            self.start_y = self.current_y
+        if 0 < dt < 1.0:  # Sanity check
+            # EKF Prediction step with IMU
+            self.predict_with_imu(dt, msg)
+            self.last_imu_time = current_time
             
-            # Set boundaries as ±2 meters from center point
-            self.boundary_x_min = self.start_x - self.boundary_radius
-            self.boundary_x_max = self.start_x + self.boundary_radius
-            self.boundary_y_min = self.start_y - self.boundary_radius
-            self.boundary_y_max = self.start_y + self.boundary_radius
-            
-            self.get_logger().info(
-                f'Initial position set: x={self.start_x:.2f}, y={self.start_y:.2f}\n' +
-                f'Boundaries set: x=[{self.boundary_x_min:.2f}, {self.boundary_x_max:.2f}], ' +
-                f'y=[{self.boundary_y_min:.2f}, {self.boundary_y_max:.2f}]'
+            self.get_logger().debug(
+                f'IMU: angular_vel={msg.angular_velocity.z:.3f}, '
+                f'linear_accel=({msg.linear_acceleration.x:.3f}, {msg.linear_acceleration.y:.3f})',
+                throttle_duration_sec=2.0
             )
+    
+    def predict_with_imu(self, dt, imu_msg):
+        """EKF prediction step enhanced with IMU data"""
+        # State transition matrix
+        F = np.eye(6)
+        F[0, 3] = dt  # x += vx * dt
+        F[1, 4] = dt  # y += vy * dt  
+        F[2, 5] = dt  # theta += omega * dt
         
-        # Calculate distance from start (center)
-        self.distance_from_start = math.sqrt(
-            (self.current_x - self.start_x) ** 2 + 
-            (self.current_y - self.start_y) ** 2
+        # Use IMU angular velocity for better prediction
+        imu_omega = imu_msg.angular_velocity.z
+        
+        # Predict state with IMU angular velocity
+        predicted_state = F @ self.state
+        predicted_state[5] = imu_omega  # Use IMU angular velocity directly
+        predicted_state[2] = self.state[2] + imu_omega * dt  # Update theta with IMU
+        predicted_state[2] = self.normalize_angle(predicted_state[2])
+        
+        self.state = predicted_state
+        
+        # Predict covariance
+        self.P = F @ self.P @ F.T + self.Q
+        
+        # Update with IMU angular velocity measurement
+        self.update_imu_angular_velocity(imu_omega)
+    
+    def update_imu_angular_velocity(self, angular_velocity):
+        """Update EKF with IMU angular velocity measurement"""
+        H = np.zeros((1, 6))
+        H[0, 5] = 1  # omega measurement
+        
+        z = np.array([angular_velocity])
+        y = z - H @ self.state
+        
+        S = H @ self.P @ H.T + self.R_imu
+        K = self.P @ H.T @ np.linalg.inv(S)
+        
+        self.state = self.state + K @ y
+        self.P = (np.eye(6) - K @ H) @ self.P
+    
+    def fusion_callback(self):
+        """Main fusion callback - combines wheel odometry and IMU-enhanced state"""
+        if self.latest_wheel_odom is None:
+            return
+        
+        current_time = self.get_clock().now()
+        dt = (current_time - self.last_update_time).nanoseconds / 1e9
+        
+        if dt > 0:
+            # Extract wheel odometry data
+            odom_x = self.latest_wheel_odom.pose.pose.position.x
+            odom_y = self.latest_wheel_odom.pose.pose.position.y
+            odom_q = self.latest_wheel_odom.pose.pose.orientation
+            odom_euler = tf_transformations.euler_from_quaternion([odom_q.x, odom_q.y, odom_q.z, odom_q.w])
+            odom_theta = odom_euler[2]
+            
+            # Extract velocity data
+            odom_vx = self.latest_wheel_odom.twist.twist.linear.x
+            odom_vy = self.latest_wheel_odom.twist.twist.linear.y
+            odom_omega = self.latest_wheel_odom.twist.twist.angular.z
+            
+            # Update EKF with wheel odometry measurement
+            self.update_wheel_odometry(odom_x, odom_y, odom_theta, odom_vx, odom_vy, odom_omega)
+            
+            # Publish fused results
+            self.publish_fused_odometry()
+            self.publish_pose()
+            self.publish_transform()
+            
+            self.last_update_time = current_time
+    
+    def update_wheel_odometry(self, x, y, theta, vx, vy, omega):
+        """Update EKF with wheel odometry measurement"""
+        # Measurement model for full state observation
+        H = np.eye(6)  # Direct observation of all states
+        
+        z = np.array([x, y, theta, vx, vy, omega])
+        y_k = z - H @ self.state
+        y_k[2] = self.normalize_angle(y_k[2])  # Handle angle wrapping
+        
+        # Use full covariance for odometry + velocity
+        R_full = np.zeros((6, 6))
+        R_full[:3, :3] = self.R_odom  # Position and orientation
+        R_full[3:, 3:] = np.diag([0.05, 0.05, 0.02])  # Velocity measurements
+        
+        S = H @ self.P @ H.T + R_full
+        K = self.P @ H.T @ np.linalg.inv(S)
+        
+        self.state = self.state + K @ y_k
+        self.state[2] = self.normalize_angle(self.state[2])
+        self.P = (np.eye(6) - K @ H) @ self.P
+        
+        self.get_logger().debug(
+            f'EKF State: pos=({self.state[0]:.3f}, {self.state[1]:.3f}), '
+            f'theta={math.degrees(self.state[2]):.1f}°, '
+            f'vel=({self.state[3]:.3f}, {self.state[5]:.3f})',
+            throttle_duration_sec=1.0
         )
+    
+    def publish_fused_odometry(self):
+        """Publish fused odometry result"""
+        msg = Odometry()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'odom'
+        msg.child_frame_id = 'base_link'
         
-        # Check if spiral is expanding
-        current_time = time.time()
-        if current_time - self.last_radius_check_time > self.radius_check_interval:
-            radius_change = self.distance_from_start - self.last_radius
-            self.get_logger().info(f'Radius change over {self.radius_check_interval}s: {radius_change:.3f}m')
-            
-            # If radius hasn't changed significantly, we might be stuck
-            if abs(radius_change) < 0.05 and self.target_linear_speed > 0.2:
-                self.stalled_count += 1
-                if self.stalled_count >= 2:  # If stalled for multiple checks
-                    self.get_logger().warning('Spiral not expanding, increasing linear_speed_increment')
-                    self.linear_speed_increment *= 1.5  # Increase speed increment
-                    self.stalled_count = 0
-            else:
-                self.stalled_count = 0
-                
-            self.last_radius = self.distance_from_start
-            self.last_radius_check_time = current_time
+        # Position from EKF state
+        msg.pose.pose.position.x = self.state[0]
+        msg.pose.pose.position.y = self.state[1]
+        msg.pose.pose.position.z = 0.0
         
-        self.get_logger().debug(f'Current position: x={self.current_x:.2f}, y={self.current_y:.2f}, ' +
-                              f'distance from center: {self.distance_from_start:.2f}m')
-
-    def check_boundaries(self):
-        # Calculate distances to each boundary
-        distance_to_x_min = abs(self.current_x - self.boundary_x_min)
-        distance_to_x_max = abs(self.boundary_x_max - self.current_x)
-        distance_to_y_min = abs(self.current_y - self.boundary_y_min)
-        distance_to_y_max = abs(self.boundary_y_max - self.current_y)
+        # Orientation from EKF state
+        quat = tf_transformations.quaternion_from_euler(0, 0, self.state[2])
+        msg.pose.pose.orientation.x = quat[0]
+        msg.pose.pose.orientation.y = quat[1]
+        msg.pose.pose.orientation.z = quat[2]
+        msg.pose.pose.orientation.w = quat[3]
         
-        # Calculate distance to circular boundary from center
-        distance_to_circular_boundary = self.boundary_radius - self.distance_from_start
+        # Velocity from EKF state
+        msg.twist.twist.linear.x = self.state[3]
+        msg.twist.twist.linear.y = self.state[4]
+        msg.twist.twist.angular.z = self.state[5]
         
-        # Find the closest boundary
-        min_distance = min(distance_to_x_min, distance_to_x_max,
-                          distance_to_y_min, distance_to_y_max, 
-                          distance_to_circular_boundary)
+        # Covariance from EKF
+        pose_cov = np.zeros(36)
+        pose_cov[0] = self.P[0, 0]   # x variance
+        pose_cov[7] = self.P[1, 1]   # y variance
+        pose_cov[35] = self.P[2, 2]  # theta variance
+        msg.pose.covariance = pose_cov.tolist()
         
-        # Check if approaching boundary
-        if min_distance < self.boundary_slowdown_distance:
-            self.boundary_approaching = True
-            # Slow down proportionally to boundary proximity
-            slowdown_factor = min_distance / self.boundary_slowdown_distance
-            return slowdown_factor
-        else:
-            self.boundary_approaching = False
-            
-        # Check if the robot is within defined boundaries
-        if (self.current_x < self.boundary_x_min or 
-            self.current_x > self.boundary_x_max or
-            self.current_y < self.boundary_y_min or
-            self.current_y > self.boundary_y_max or
-            self.distance_from_start > self.boundary_radius):
-            
-            self.get_logger().warning(f'Boundary reached at position x={self.current_x:.2f}, y={self.current_y:.2f}')
-            return 0.0  # Return 0 to stop the robot
+        twist_cov = np.zeros(36)
+        twist_cov[0] = self.P[3, 3]   # vx variance
+        twist_cov[7] = self.P[4, 4]   # vy variance
+        twist_cov[35] = self.P[5, 5]  # omega variance
+        msg.twist.covariance = twist_cov.tolist()
         
-        return 1.0  # Normal operation
-
-    def timer_callback(self):
-        # Skip if we don't have wheel pose data yet
-        if self.start_x is None:
-            self.get_logger().info('Waiting for initial wheel pose data...')
-            return
-
-        # Check boundaries and get slowdown factor
-        boundary_factor = self.check_boundaries()
+        self.fused_odom_pub.publish(msg)
+    
+    def publish_pose(self):
+        """Publish pose with covariance"""
+        msg = PoseWithCovarianceStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'odom'
         
-        if boundary_factor <= 0:
-            stop_msg = Twist()
-            self.publisher_.publish(stop_msg)
-            self.get_logger().info('Boundary reached. Stopping robot and shutting down node.')
-            self.timer.cancel()  # Stop the timer
-            rclpy.shutdown()  # Shut down ROS
-            return
+        # Position
+        msg.pose.pose.position.x = self.state[0]
+        msg.pose.pose.position.y = self.state[1]
+        msg.pose.pose.position.z = 0.0
         
-        # If approaching boundary, adjust target speeds
-        if self.boundary_approaching:
-            adjusted_target_linear = self.target_linear_speed * boundary_factor
-            adjusted_target_angular = self.desired_angular_speed * boundary_factor
-            self.get_logger().info(f'Approaching boundary. Slowing down: factor={boundary_factor:.2f}')
-        else:
-            adjusted_target_linear = self.target_linear_speed
-            adjusted_target_angular = self.desired_angular_speed
+        # Orientation
+        quat = tf_transformations.quaternion_from_euler(0, 0, self.state[2])
+        msg.pose.pose.orientation.x = quat[0]
+        msg.pose.pose.orientation.y = quat[1]
+        msg.pose.pose.orientation.z = quat[2]
+        msg.pose.pose.orientation.w = quat[3]
         
-        # Check if we've reached the maximum speed
-        if self.target_linear_speed >= self.max_linear_speed:
-            stop_msg = Twist()
-            self.publisher_.publish(stop_msg)
-            self.get_logger().info('Max speed reached. Stopping robot and shutting down node.')
-            self.timer.cancel()  # Stop the timer
-            rclpy.shutdown()  # Shut down ROS
-            return
-
-        # Use PID to compute linear and angular velocity commands
-        linear_output = self.linear_pid.compute(adjusted_target_linear, self.current_linear_speed)
-        angular_output = self.angular_pid.compute(adjusted_target_angular, self.current_angular_speed)
+        # Covariance
+        pose_cov = np.zeros(36)
+        pose_cov[0] = self.P[0, 0]
+        pose_cov[7] = self.P[1, 1]
+        pose_cov[35] = self.P[2, 2]
+        msg.pose.covariance = pose_cov.tolist()
         
-        # Create Twist message
-        twist_msg = Twist()
-        twist_msg.linear.x = linear_output
-        twist_msg.angular.z = angular_output
-
-        # Publish Twist message
-        self.publisher_.publish(twist_msg)
-
-        # Increment target linear speed according to spiral pattern
-        self.target_linear_speed += self.linear_speed_increment
-
-        # Log current speeds and position
-        self.get_logger().info(
-            f'Target: lin={adjusted_target_linear:.3f}, ang={adjusted_target_angular:.3f} | ' +
-            f'Command: lin={linear_output:.3f}, ang={angular_output:.3f} | ' +
-            f'Position: x={self.current_x:.2f}, y={self.current_y:.2f}, dist={self.distance_from_start:.2f}m'
-        )
+        self.pose_pub.publish(msg)
+    
+    def publish_transform(self):
+        """Publish fused transform"""
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'odom'
+        t.child_frame_id = 'base_link'
+        
+        # Translation
+        t.transform.translation.x = self.state[0]
+        t.transform.translation.y = self.state[1]
+        t.transform.translation.z = 0.0
+        
+        # Rotation
+        quat = tf_transformations.quaternion_from_euler(0, 0, self.state[2])
+        t.transform.rotation.x = quat[0]
+        t.transform.rotation.y = quat[1]
+        t.transform.rotation.z = quat[2]
+        t.transform.rotation.w = quat[3]
+        
+        self.tf_broadcaster.sendTransform(t)
+    
+    def normalize_angle(self, angle):
+        """Normalize angle to [-pi, pi]"""
+        return math.atan2(math.sin(angle), math.cos(angle))
 
 def main(args=None):
     rclpy.init(args=args)
-
-    spiral_motion_node = SpiralMotionNode()
-
+    
     try:
-        rclpy.spin(spiral_motion_node)
+        node = RaspberryLocalizationNode()
+        rclpy.spin(node)
     except KeyboardInterrupt:
-        stop_msg = Twist()
-        spiral_motion_node.publisher_.publish(stop_msg)
-        spiral_motion_node.get_logger().info('KeyboardInterrupt: Stopping robot and shutting down node')
+        pass
     finally:
-        spiral_motion_node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
-if __name__ == '__main__': 
+if __name__ == '__main__':
     main()
