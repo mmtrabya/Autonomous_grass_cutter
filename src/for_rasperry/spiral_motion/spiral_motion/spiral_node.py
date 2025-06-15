@@ -248,9 +248,6 @@ class SpiralMotionNode(Node):
         if self.startup_phase and current_time - self.startup_time > self.startup_phase_duration:
             self.startup_phase = False
             self.get_logger().info('Startup phase complete, continuing with normal expansion')
-        
-        self.get_logger().debug(f'Position: x={self.current_x:.2f}, y={self.current_y:.2f}, ' +
-                              f'distance from center: {self.distance_from_start:.2f}m')
 
     def check_boundaries(self):
         # If we don't have position data, return 1.0
@@ -324,7 +321,59 @@ class SpiralMotionNode(Node):
         return 1.0  # Normal operation
 
     def timer_callback(self):
-        try:
-            # Check if odometry data is too old
-            current_time = time.time()
-            if self.last_odom_time is not None and current_time -
+        current_time = time.time()
+        
+        # Check for odometry timeout in a safer way
+        if self.last_odom_time is not None:
+            time_since_last_odom = current_time - self.last_odom_time
+            if time_since_last_odom > self.odom_timeout:
+                self.get_logger().warning('Odometry data timeout! Stopping for safety.')
+                stop_msg = Twist()
+                self.publisher_.publish(stop_msg)
+                self.last_published_cmd = stop_msg
+                self.last_cmd_time = current_time
+                return
+            
+        # Skip if we don't have odometry data yet
+        if self.start_x is None:
+            self.get_logger().info('Waiting for initial odometry data...')
+            return
+
+        # Check boundaries and get slowdown factor
+        boundary_factor = self.check_boundaries()
+        
+        if boundary_factor <= 0:
+            stop_msg = Twist()
+            self.publisher_.publish(stop_msg)
+            self.last_published_cmd = stop_msg
+            self.last_cmd_time = current_time
+            self.get_logger().info('Boundary reached. Stopping robot and shutting down node.')
+            self.timer.cancel()  # Stop the timer
+            rclpy.shutdown()  # Shut down ROS
+            return
+        
+        # If in startup phase, apply extra acceleration
+        if self.startup_phase:
+            # Higher linear speed increment during startup
+            self.linear_speed_increment = 0.006  # Very aggressive during startup
+        else:
+            # Return to normal increment after startup
+            self.linear_speed_increment = 0.004
+        
+        # If approaching boundary, adjust target speeds
+        if self.boundary_approaching:
+            adjusted_target_linear = self.target_linear_speed * boundary_factor
+            adjusted_target_angular = self.desired_angular_speed * boundary_factor
+            self.get_logger().info(f'Approaching boundary. Slowing down: factor={boundary_factor:.2f}')
+        else:
+            adjusted_target_linear = self.target_linear_speed
+            adjusted_target_angular = self.desired_angular_speed
+        
+        # Check if we've reached the maximum speed
+        if self.target_linear_speed >= self.max_linear_speed:
+            stop_msg = Twist()
+            self.publisher_.publish(stop_msg)
+            self.last_published_cmd = stop_msg
+            self.last_cmd_time = current_time
+            self.get_logger().info('Max speed reached. Stopping robot and shutting down node.')
+            self.timer.cancel()  # Stop the timer
