@@ -1,4 +1,3 @@
-# spiral_motion/spiral_motion/spiral_node.py
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -77,10 +76,10 @@ class SpiralMotionNode(Node):
         # Create publisher for cmd_vel topic
         self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
         
-        # Create subscriber for odometry
+        # Create subscriber for odometry - CHANGED FOR RASPBERRY PI
         self.odom_subscription = self.create_subscription(
             Odometry,
-            '/localization/odometry',
+            '/localization/odometry',  # Raspberry Pi's odometry topic
             self.odom_callback,
             10)
 
@@ -132,6 +131,10 @@ class SpiralMotionNode(Node):
         # Create timer with rate matching control node delay
         self.timer = self.create_timer(self.update_rate, self.timer_callback)
         
+        # Failsafe timer to ensure odometry data is coming in
+        self.failsafe_timer = self.create_timer(5.0, self.check_odometry)
+        self.received_odom = False
+        
         # Variables to track motion progress
         self.last_radius_check_time = time.time()
         self.radius_check_interval = 6.0  # Check every 6 seconds - increased for slower updates
@@ -144,15 +147,38 @@ class SpiralMotionNode(Node):
         self.startup_phase_duration = 5.0  # seconds
         self.startup_time = time.time()
 
-        self.get_logger().info('Spiral motion node with PID control has been started (optimized for larger spiral)')
+        self.get_logger().info('Spiral motion node with PID control has been started for RASPBERRY PI (optimized for larger spiral)')
 
         # Publish an initial zero message
         zero_twist = Twist()
         self.publisher_.publish(zero_twist)
         self.last_published_cmd = zero_twist
         self.get_logger().info('Published initial zero command')
+    
+    def check_odometry(self):
+        """Check if we're receiving odometry data"""
+        if not self.received_odom:
+            self.get_logger().warn('No odometry data received on /localization/odometry after 5 seconds!')
+            self.get_logger().warn('Using default values for position. Spiral may not be accurate.')
+            # Set defaults to allow operation without odometry
+            self.start_x = 0.0
+            self.start_y = 0.0
+            
+            # Set boundaries
+            self.boundary_x_min = self.start_x - self.boundary_radius
+            self.boundary_x_max = self.start_x + self.boundary_radius
+            self.boundary_y_min = self.start_y - self.boundary_radius
+            self.boundary_y_max = self.start_y + self.boundary_radius
+        else:
+            self.get_logger().info('Successfully receiving odometry data')
+        
+        # Either way, cancel the timer after first check
+        self.failsafe_timer.cancel()
 
     def odom_callback(self, msg):
+        # Set flag that we've received data
+        self.received_odom = True
+        
         # Update last odometry time
         self.last_odom_time = time.time()
         
@@ -227,6 +253,10 @@ class SpiralMotionNode(Node):
                               f'distance from center: {self.distance_from_start:.2f}m')
 
     def check_boundaries(self):
+        # If we don't have position data, return 1.0
+        if self.start_x is None:
+            return 1.0
+            
         # Calculate distances to each boundary
         distance_to_x_min = abs(self.current_x - self.boundary_x_min)
         distance_to_x_max = abs(self.boundary_x_max - self.current_x)
@@ -294,91 +324,7 @@ class SpiralMotionNode(Node):
         return 1.0  # Normal operation
 
     def timer_callback(self):
-        # Check if odometry data is too old
-        current_time = time.time()
-        if self.last_odom_time is not None and current_time - self.last_odom_time > self.odom_timeout:
-            self.get_logger().warning('Odometry data timeout! Stopping for safety.')
-            stop_msg = Twist()
-            self.publisher_.publish(stop_msg)
-            self.last_published_cmd = stop_msg
-            self.last_cmd_time = current_time
-            return
-            
-        # Skip if we don't have odometry data yet
-        if self.start_x is None:
-            self.get_logger().info('Waiting for initial odometry data...')
-            return
-
-        # Check boundaries and get slowdown factor
-        boundary_factor = self.check_boundaries()
-        
-        if boundary_factor <= 0:
-            stop_msg = Twist()
-            self.publisher_.publish(stop_msg)
-            self.last_published_cmd = stop_msg
-            self.last_cmd_time = current_time
-            self.get_logger().info('Boundary reached. Stopping robot and shutting down node.')
-            self.timer.cancel()  # Stop the timer
-            rclpy.shutdown()  # Shut down ROS
-            return
-        
-        # If in startup phase, apply extra acceleration
-        if self.startup_phase:
-            # Higher linear speed increment during startup
-            self.linear_speed_increment = 0.006  # Very aggressive during startup
-        else:
-            # Return to normal increment after startup
-            self.linear_speed_increment = 0.004
-        
-        # If approaching boundary, adjust target speeds
-        if self.boundary_approaching:
-            adjusted_target_linear = self.target_linear_speed * boundary_factor
-            adjusted_target_angular = self.desired_angular_speed * boundary_factor
-            self.get_logger().info(f'Approaching boundary. Slowing down: factor={boundary_factor:.2f}')
-        else:
-            adjusted_target_linear = self.target_linear_speed
-            adjusted_target_angular = self.desired_angular_speed
-        
-        # Check if we've reached the maximum speed
-        if self.target_linear_speed >= self.max_linear_speed:
-            stop_msg = Twist()
-            self.publisher_.publish(stop_msg)
-            self.last_published_cmd = stop_msg
-            self.last_cmd_time = current_time
-            self.get_logger().info('Max speed reached. Stopping robot and shutting down node.')
-            self.timer.cancel()  # Stop the timer
-            rclpy.shutdown()  # Shut down ROS
-            return
-
-        # Use PID to compute linear and angular velocity commands
-        linear_output = self.linear_pid.compute(adjusted_target_linear, self.current_linear_speed)
-        angular_output = self.angular_pid.compute(adjusted_target_angular, self.current_angular_speed)
-        
-        # Create Twist message
-        twist_msg = Twist()
-        twist_msg.linear.x = linear_output
-        twist_msg.angular.z = angular_output
-
-        # Always publish the command since our rate is matched to control node's delay
-        self.publisher_.publish(twist_msg)
-        self.last_published_cmd = twist_msg
-        self.last_cmd_time = current_time
-        
-        # Log that we published a command
-        self.get_logger().info(
-            f'CMD: lin={linear_output:.3f}, ang={angular_output:.3f} | ' +
-            f'Pos: x={self.current_x:.2f}, y={self.current_y:.2f}, dist={self.distance_from_start:.2f}m | ' +
-            f'Target lin={adjusted_target_linear:.3f}, increment={self.linear_speed_increment:.5f}'
-        )
-        
-        # Increment target linear speed according to spiral pattern
-        self.target_linear_speed += self.linear_speed_increment
-
-def main(args=None):
-    rclpy.init(args=args)
-
-    spiral_motion_node = SpiralMotionNode()
-
-    try:
-        rclpy.spin(spiral_motion_node)
-    except KeyboardInterrupt:
+        try:
+            # Check if odometry data is too old
+            current_time = time.time()
+            if self.last_odom_time is not None and current_time -
