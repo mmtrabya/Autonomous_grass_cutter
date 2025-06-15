@@ -16,7 +16,7 @@ class PIDController:
         self.filter_coefficient = filter_coefficient
         self.filtered_output = 0.0
         self.last_derivative = 0.0
-        self.derivative_filter = 0.5
+        self.derivative_filter = 0.7  # Increased filtering for real hardware
         
         self.previous_error = 0.0
         self.integral = 0.0
@@ -84,12 +84,17 @@ class SpiralMotionNode(Node):
             self.odom_callback,
             10)
 
-        # Spiral motion parameters
-        self.desired_angular_speed = 0.5  # rad/s
-        self.initial_linear_speed = 0.1  # m/s
-        self.linear_speed_increment = 0.001  # m/s per cycle
-        self.max_linear_speed = 12  # m/s
-        self.update_rate = 0.1  # seconds
+        # Spiral motion parameters - SIGNIFICANTLY INCREASED for faster expansion
+        self.desired_angular_speed = 0.4  # rad/s - slightly reduced for better stability
+        self.initial_linear_speed = 0.08  # m/s - increased starting value
+        self.linear_speed_increment = 0.004  # m/s per cycle - GREATLY increased for faster expansion
+        self.max_linear_speed = 0.25  # m/s - based on 37 RPM motors with 13cm wheels
+        self.update_rate = 0.6  # seconds - match control node's 0.5s delay plus buffer
+        
+        # Flag to ensure commands are sent
+        self.last_cmd_time = time.time()
+        self.cmd_timeout = 0.7  # seconds - longer than control node delay
+        self.last_published_cmd = Twist()
 
         # Current target speeds
         self.target_linear_speed = self.initial_linear_speed
@@ -105,13 +110,15 @@ class SpiralMotionNode(Node):
         self.start_x = None
         self.start_y = None
         self.distance_from_start = 0.0
+        self.last_odom_time = None
+        self.odom_timeout = 2.0  # seconds - increased for slower updates
         
-        # PID controllers
-        self.linear_pid = PIDController(kp=0.8, ki=0.1, kd=0.05, output_min=0.0, output_max=self.max_linear_speed, filter_coefficient=0.3)
-        self.angular_pid = PIDController(kp=1.0, ki=0.1, kd=0.1, output_min=-1.0, output_max=1.0, filter_coefficient=0.3)
+        # PID controllers - adjusted for more aggressive acceleration
+        self.linear_pid = PIDController(kp=1.0, ki=0.2, kd=0.05, output_min=0.0, output_max=self.max_linear_speed, filter_coefficient=0.5)
+        self.angular_pid = PIDController(kp=1.0, ki=0.2, kd=0.1, output_min=-0.5, output_max=0.5, filter_coefficient=0.5)
         
-        # Boundary parameters - will be set when initial position is known
-        self.boundary_radius = 2.0  # 2 meters in each direction from center
+        # Boundary parameters - INCREASED for larger spiral
+        self.boundary_radius = 5.0  # meters - INCREASED from 2.0 to 5.0
         self.boundary_x_min = 0.0  # To be set after initialization
         self.boundary_x_max = 0.0  # To be set after initialization
         self.boundary_y_min = 0.0  # To be set after initialization
@@ -119,26 +126,36 @@ class SpiralMotionNode(Node):
         self.max_distance = self.boundary_radius  # Set max distance to boundary radius
         
         # Boundary approach parameters
-        self.boundary_slowdown_distance = 0.3  # meters
+        self.boundary_slowdown_distance = 0.5  # meters - increased for earlier slowdown with control delay
         self.boundary_approaching = False
 
-        # Create timer
+        # Create timer with rate matching control node delay
         self.timer = self.create_timer(self.update_rate, self.timer_callback)
-
+        
         # Variables to track motion progress
         self.last_radius_check_time = time.time()
-        self.radius_check_interval = 3.0  # Check every 3 seconds
+        self.radius_check_interval = 6.0  # Check every 6 seconds - increased for slower updates
         self.last_radius = 0.0
         self.stalled_count = 0
+        self.movement_detection_threshold = 0.03  # meters - increased threshold for detection
 
-        self.get_logger().info('Spiral motion node with PID control has been started')
+        # Flag to ensure we accelerate quickly at the beginning
+        self.startup_phase = True
+        self.startup_phase_duration = 5.0  # seconds
+        self.startup_time = time.time()
+
+        self.get_logger().info('Spiral motion node with PID control has been started (optimized for larger spiral)')
 
         # Publish an initial zero message
         zero_twist = Twist()
         self.publisher_.publish(zero_twist)
+        self.last_published_cmd = zero_twist
         self.get_logger().info('Published initial zero command')
 
     def odom_callback(self, msg):
+        # Update last odometry time
+        self.last_odom_time = time.time()
+        
         # Extract position from odometry message
         self.current_x = msg.pose.pose.position.x
         self.current_y = msg.pose.pose.position.y
@@ -159,7 +176,7 @@ class SpiralMotionNode(Node):
             self.start_x = self.current_x
             self.start_y = self.current_y
             
-            # Set boundaries as ±2 meters from center point
+            # Set boundaries as ±boundary_radius meters from center point
             self.boundary_x_min = self.start_x - self.boundary_radius
             self.boundary_x_max = self.start_x + self.boundary_radius
             self.boundary_y_min = self.start_y - self.boundary_radius
@@ -184,19 +201,29 @@ class SpiralMotionNode(Node):
             self.get_logger().info(f'Radius change over {self.radius_check_interval}s: {radius_change:.3f}m')
             
             # If radius hasn't changed significantly, we might be stuck
-            if abs(radius_change) < 0.05 and self.target_linear_speed > 0.2:
+            if abs(radius_change) < self.movement_detection_threshold and self.target_linear_speed > 0.05:
                 self.stalled_count += 1
                 if self.stalled_count >= 2:  # If stalled for multiple checks
-                    self.get_logger().warning('Spiral not expanding, increasing linear_speed_increment')
-                    self.linear_speed_increment *= 1.5  # Increase speed increment
+                    self.get_logger().warning('Spiral not expanding, GREATLY increasing linear_speed_increment')
+                    self.linear_speed_increment *= 2.0  # DOUBLED speed increment for stuck conditions
+                    # Try to break out of stall by temporarily increasing angular speed
+                    self.desired_angular_speed *= 1.2
                     self.stalled_count = 0
             else:
                 self.stalled_count = 0
+                # Reset angular speed if we were previously stalled
+                if self.desired_angular_speed > 0.4:
+                    self.desired_angular_speed = 0.4
                 
             self.last_radius = self.distance_from_start
             self.last_radius_check_time = current_time
+
+        # Handle startup phase - extra boost to get moving quickly
+        if self.startup_phase and current_time - self.startup_time > self.startup_phase_duration:
+            self.startup_phase = False
+            self.get_logger().info('Startup phase complete, continuing with normal expansion')
         
-        self.get_logger().debug(f'Current position: x={self.current_x:.2f}, y={self.current_y:.2f}, ' +
+        self.get_logger().debug(f'Position: x={self.current_x:.2f}, y={self.current_y:.2f}, ' +
                               f'distance from center: {self.distance_from_start:.2f}m')
 
     def check_boundaries(self):
@@ -214,17 +241,48 @@ class SpiralMotionNode(Node):
                           distance_to_y_min, distance_to_y_max, 
                           distance_to_circular_boundary)
         
+        # Predict position after control delay for early boundary detection
+        delay_time = 0.5  # Control node delay in seconds
+        predicted_x = self.current_x + self.current_linear_speed * math.cos(self.current_yaw) * delay_time
+        predicted_y = self.current_y + self.current_linear_speed * math.sin(self.current_yaw) * delay_time
+        
+        # Calculate predicted distance from center
+        predicted_distance = math.sqrt(
+            (predicted_x - self.start_x) ** 2 + 
+            (predicted_y - self.start_y) ** 2
+        )
+        
+        # Calculate predicted distances to boundaries
+        pred_distance_to_x_min = abs(predicted_x - self.boundary_x_min)
+        pred_distance_to_x_max = abs(self.boundary_x_max - predicted_x)
+        pred_distance_to_y_min = abs(predicted_y - self.boundary_y_min)
+        pred_distance_to_y_max = abs(self.boundary_y_max - predicted_y)
+        pred_distance_to_circular = self.boundary_radius - predicted_distance
+        
+        # Find the closest boundary based on prediction
+        pred_min_distance = min(pred_distance_to_x_min, pred_distance_to_x_max,
+                               pred_distance_to_y_min, pred_distance_to_y_max, 
+                               pred_distance_to_circular)
+        
+        # Use the smaller of current or predicted distance for safety
+        effective_distance = min(min_distance, pred_min_distance)
+        
         # Check if approaching boundary
-        if min_distance < self.boundary_slowdown_distance:
+        if effective_distance < self.boundary_slowdown_distance:
             self.boundary_approaching = True
             # Slow down proportionally to boundary proximity
-            slowdown_factor = min_distance / self.boundary_slowdown_distance
+            slowdown_factor = effective_distance / self.boundary_slowdown_distance
             return slowdown_factor
         else:
             self.boundary_approaching = False
             
-        # Check if the robot is within defined boundaries
-        if (self.current_x < self.boundary_x_min or 
+        # Check if the robot is within defined boundaries (current or predicted)
+        if (predicted_x < self.boundary_x_min or 
+            predicted_x > self.boundary_x_max or
+            predicted_y < self.boundary_y_min or
+            predicted_y > self.boundary_y_max or
+            predicted_distance > self.boundary_radius or
+            self.current_x < self.boundary_x_min or 
             self.current_x > self.boundary_x_max or
             self.current_y < self.boundary_y_min or
             self.current_y > self.boundary_y_max or
@@ -236,6 +294,16 @@ class SpiralMotionNode(Node):
         return 1.0  # Normal operation
 
     def timer_callback(self):
+        # Check if odometry data is too old
+        current_time = time.time()
+        if self.last_odom_time is not None and current_time - self.last_odom_time > self.odom_timeout:
+            self.get_logger().warning('Odometry data timeout! Stopping for safety.')
+            stop_msg = Twist()
+            self.publisher_.publish(stop_msg)
+            self.last_published_cmd = stop_msg
+            self.last_cmd_time = current_time
+            return
+            
         # Skip if we don't have odometry data yet
         if self.start_x is None:
             self.get_logger().info('Waiting for initial odometry data...')
@@ -247,10 +315,20 @@ class SpiralMotionNode(Node):
         if boundary_factor <= 0:
             stop_msg = Twist()
             self.publisher_.publish(stop_msg)
+            self.last_published_cmd = stop_msg
+            self.last_cmd_time = current_time
             self.get_logger().info('Boundary reached. Stopping robot and shutting down node.')
             self.timer.cancel()  # Stop the timer
             rclpy.shutdown()  # Shut down ROS
             return
+        
+        # If in startup phase, apply extra acceleration
+        if self.startup_phase:
+            # Higher linear speed increment during startup
+            self.linear_speed_increment = 0.006  # Very aggressive during startup
+        else:
+            # Return to normal increment after startup
+            self.linear_speed_increment = 0.004
         
         # If approaching boundary, adjust target speeds
         if self.boundary_approaching:
@@ -265,6 +343,8 @@ class SpiralMotionNode(Node):
         if self.target_linear_speed >= self.max_linear_speed:
             stop_msg = Twist()
             self.publisher_.publish(stop_msg)
+            self.last_published_cmd = stop_msg
+            self.last_cmd_time = current_time
             self.get_logger().info('Max speed reached. Stopping robot and shutting down node.')
             self.timer.cancel()  # Stop the timer
             rclpy.shutdown()  # Shut down ROS
@@ -279,18 +359,20 @@ class SpiralMotionNode(Node):
         twist_msg.linear.x = linear_output
         twist_msg.angular.z = angular_output
 
-        # Publish Twist message
+        # Always publish the command since our rate is matched to control node's delay
         self.publisher_.publish(twist_msg)
-
+        self.last_published_cmd = twist_msg
+        self.last_cmd_time = current_time
+        
+        # Log that we published a command
+        self.get_logger().info(
+            f'CMD: lin={linear_output:.3f}, ang={angular_output:.3f} | ' +
+            f'Pos: x={self.current_x:.2f}, y={self.current_y:.2f}, dist={self.distance_from_start:.2f}m | ' +
+            f'Target lin={adjusted_target_linear:.3f}, increment={self.linear_speed_increment:.5f}'
+        )
+        
         # Increment target linear speed according to spiral pattern
         self.target_linear_speed += self.linear_speed_increment
-
-        # Log current speeds and position
-        self.get_logger().info(
-            f'Target: lin={adjusted_target_linear:.3f}, ang={adjusted_target_angular:.3f} | ' +
-            f'Command: lin={linear_output:.3f}, ang={angular_output:.3f} | ' +
-            f'Position: x={self.current_x:.2f}, y={self.current_y:.2f}, dist={self.distance_from_start:.2f}m'
-        )
 
 def main(args=None):
     rclpy.init(args=args)
@@ -300,12 +382,3 @@ def main(args=None):
     try:
         rclpy.spin(spiral_motion_node)
     except KeyboardInterrupt:
-        stop_msg = Twist()
-        spiral_motion_node.publisher_.publish(stop_msg)
-        spiral_motion_node.get_logger().info('KeyboardInterrupt: Stopping robot and shutting down node')
-    finally:
-        spiral_motion_node.destroy_node()
-        rclpy.shutdown()
-
-if __name__ == '__main__': 
-    main()
