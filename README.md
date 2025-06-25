@@ -21,7 +21,7 @@ Built for **municipalities**, **landscaping companies**, and **smart infrastruct
 ---
 
 ## 🧠 Technologies Used  
-- **ROS 2 Foxy** (on Raspberry Pi 4)  
+- **ROS 2 Humble** (on Raspberry Pi 4)  
 - **Arduino (Uno/Nano)** – motor control, encoder reading  
 - **Python** + **C++** for ROS nodes  
 - **QGIS / GeoJSON** for map zones  
