@@ -1,8 +1,0 @@
-source;share/lc29h_gps_rtk/hook/cmake_prefix_path.ps1
-source;share/lc29h_gps_rtk/hook/cmake_prefix_path.dsv
-source;share/lc29h_gps_rtk/hook/cmake_prefix_path.sh
-source;share/lc29h_gps_rtk/local_setup.bash
-source;share/lc29h_gps_rtk/local_setup.dsv
-source;share/lc29h_gps_rtk/local_setup.ps1
-source;share/lc29h_gps_rtk/local_setup.sh
-source;share/lc29h_gps_rtk/local_setup.zsh
